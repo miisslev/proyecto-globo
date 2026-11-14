@@ -1,0 +1,36 @@
+-- tabla de vuelos
+CREATE TABLE vuelo (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    inicio TIMESTAMPTZ NOT NULL,
+    fin TIMESTAMPTZ CHECK (fin > inicio),
+    lugar TEXT,
+    longitud_cuerda_m DOUBLE PRECISION CHECK (longitud_cuerda_m > 0),
+    n_globos SMALLINT CHECK (n_globos > 0),
+    diametro_globo_m DOUBLE PRECISION CHECK (diametro_globo_m > 0),
+    cda_ef_m2 DOUBLE PRECISION,
+    p0_hpa DOUBLE PRECISION,
+    t0_c DOUBLE PRECISION,
+    hr0_pct DOUBLE PRECISION CHECK (hr0_pct BETWEEN 0 AND 100),
+    notas TEXT
+);
+
+--tabla de lecturas
+CREATE TABLE lectura (
+    id BIGSERIAL PRIMARY KEY,
+    vuelo_id INTEGER NOT NULL REFERENCES vuelo(id) ON DELETE CASCADE,
+    ts TIMESTAMPTZ NOT NULL,
+    presion_hpa DOUBLE PRECISION NOT NULL CHECK (presion_hpa > 0),
+    temperatura_c DOUBLE PRECISION NOT NULL,
+    humedad_rel_pct DOUBLE PRECISION NOT NULL CHECK (humedad_rel_pct BETWEEN 0 AND 100),
+    densidad_kg_m3 DOUBLE PRECISION NOT NULL,
+    altitud_m DOUBLE PRECISION,
+    fuerza_h_n DOUBLE PRECISION,
+    angulo_cuerda_deg DOUBLE PRECISION,
+    tension_n DOUBLE PRECISION,
+    viento_ms DOUBLE PRECISION,
+    rafaga_ms DOUBLE PRECISION,
+    viento_ref_ms DOUBLE PRECISION,
+    bateria_v DOUBLE PRECISION,
+    UNIQUE (vuelo_id, ts)
+);

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Estación en globo cautivo · Panel en vivo</title>
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--text:#16202c;--muted:#6a7787;--line:#dfe4ea;--acc:#1f7ae0;--ok:#1e9e5a;--warn:#d98a00;--bad:#d63c3c;--track:#e6ebf1;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e141b;--card:#17202a;--text:#e8edf3;--muted:#8d9aab;--line:#273341;--acc:#4da3ff;--ok:#3ecf8e;--warn:#f0b429;--bad:#ff6b6b;--track:#243140;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e141b;--card:#17202a;--text:#e8edf3;--muted:#8d9aab;--line:#273341;--acc:#4da3ff;--ok:#3ecf8e;--warn:#f0b429;--bad:#ff6b6b;--track:#243140;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:14px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+h1{font-size:18px;margin:0}
+h1 small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--acc)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:p 1s infinite}
+.paused .dot{background:var(--muted);animation:none}
+@keyframes p{50%{opacity:.3}}
+#alert{display:none;margin-bottom:12px;padding:10px 14px;border-radius:10px;background:var(--bad);color:#fff;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.card h2{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.big{font-size:34px;font-weight:700;line-height:1}
+.big span,.unit{font-size:14px;font-weight:400;color:var(--muted)}
+.row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.row:last-child{border:0}
+.row b{font-variant-numeric:tabular-nums}
+.row i{font-style:normal;color:var(--muted)}
+.bar{height:10px;background:var(--track);border-radius:6px;position:relative;overflow:hidden;margin:6px 0}
+.bar>u{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:6px;transition:width .4s,background .4s}
+.mk{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.6}
+svg{width:100%;height:auto;display:block}
+.sk{fill:none;stroke:var(--acc);stroke-width:2;stroke-linejoin:round}
+.t{fill:var(--muted);font-size:10px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.wide{grid-column:1/-1}
+.raw{font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--muted);margin-top:12px;overflow-x:auto;white-space:nowrap}
+.note{font-size:11px;color:var(--muted);margin-top:6px}
+@media print {
+  header, #alert, .grid, .raw { display: none !important; }
+  body { background: #fff !important; padding: 0 !important; }
+  #modalReporte {
+    position: static !important;
+    display: block !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+  #modalReporte .card {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  #modalReporte button { display: none !important; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Estación meteorológica en globo cautivo<small>Panel en vivo · datos simulados que imitan el paquete real del nRF24L01+</small></h1>
+ <div class="tools">
+    <span class="pill" id="st"><span class="dot"></span><span id="stt">En vivo · paquete #0</span></span>
+    <button id="gust">Simular ráfaga</button>
+    <button id="pause">Pausar</button>
+    <button id="btnReporte" style="background:var(--acc);color:#fff;border-color:var(--acc)">Generar Reporte</button>
+    <button id="theme">Tema</button>
+  </div>
+</header>
+<div id="alert"></div>
+
+<div class="grid">
+  <section class="card">
+    <h2>Velocidad del viento (fórm. 11 + N6)</h2>
+    <svg viewBox="0 0 200 115">
+      <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="var(--track)" stroke-width="14" stroke-linecap="round"/>
+      <path id="arc" d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="var(--acc)" stroke-width="14" stroke-linecap="round" stroke-dasharray="0 252"/>
+      <line id="needle" x1="100" y1="100" x2="30" y2="100" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="6" fill="var(--text)"/>
+      <text class="t" x="14" y="113">0</text><text class="t" x="96" y="16">5</text><text class="t" x="172" y="113">10 m/s</text>
+    </svg>
+    <div style="text-align:center"><div class="big"><span id="v">–</span> <span>m/s</span></div><div class="unit" id="vk">–</div></div>
+    <div class="row"><i>Ráfaga máx. (3 s)</i><b id="gmax">–</b></div>
+    <div class="row"><i>Verificación fórm. 13</i><b id="v13">–</b></div>
+    <div class="row"><i>Viento mínimo medible (N8)</i><b id="vmin">–</b></div>
+  </section>
+
+  <section class="card">
+    <h2>Vista lateral del globo</h2>
+    <svg viewBox="0 0 300 200">
+      <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--bad)"/></marker><marker id="av" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--ok)"/></marker></defs>
+      <rect x="0" y="172" width="300" height="28" fill="var(--track)"/>
+      <rect x="30" y="164" width="22" height="8" fill="var(--muted)"/>
+      <circle cx="41" cy="160" r="5" fill="none" stroke="var(--text)" stroke-width="2"/>
+      <path id="angarc" d="" fill="none" stroke="var(--warn)" stroke-width="2"/>
+      <text id="angt" class="t" x="78" y="155" style="fill:var(--warn);font-size:12px">θ</text>
+      <line id="rope" x1="41" y1="160" x2="150" y2="80" stroke="var(--text)" stroke-width="1.5"/>
+      <circle id="b1" cx="150" cy="80" r="15" fill="var(--acc)" opacity=".85"/>
+      <circle id="b2" cx="168" cy="74" r="15" fill="var(--acc)" opacity=".6"/>
+      <line id="fh" x1="0" y1="0" x2="0" y2="0" stroke="var(--bad)" stroke-width="3" marker-end="url(#ah)"/>
+      <line id="fv" x1="0" y1="0" x2="0" y2="0" stroke="var(--ok)" stroke-width="3" marker-end="url(#av)"/>
+      <text class="t" x="8" y="14">Viento →</text>
+      <text class="t" x="8" y="192">Celda + polea + base giratoria</text>
+      <text id="hlab" class="t" x="205" y="192" style="font-size:12px;fill:var(--text)"></text>
+    </svg>
+    <div class="row"><i style="color:var(--bad)">F_H (horizontal)</i><b id="fh2">–</b></div>
+    <div class="row"><i style="color:var(--ok)">F_V (vertical, campo)</i><b id="fv2">–</b></div>
+    <div class="row"><i>Ángulo geométrico (12) / componentes (14)</i><b id="ang">–</b></div>
+  </section>
+
+  <section class="card wide">
+    <h2>Últimos 60 s</h2>
+    <div class="cols">
+      <div><svg viewBox="0 0 300 80"><polyline id="skv" class="sk" points=""/><text class="t" x="2" y="10">Viento (m/s)</text><text id="skvm" class="t" x="298" y="10" text-anchor="end"></text></svg></div>
+      <div><svg viewBox="0 0 300 80"><polyline id="skf" class="sk" style="stroke:var(--bad)" points=""/><text class="t" x="2" y="10">Fuerza horizontal (N)</text><text id="skfm" class="t" x="298" y="10" text-anchor="end"></text></svg></div>
+      <div><svg viewBox="0 0 300 80"><polyline id="skh" class="sk" style="stroke:var(--ok)" points=""/><text class="t" x="2" y="10">Altura (m)</text><text id="skhm" class="t" x="298" y="10" text-anchor="end"></text></svg></div>
+      <div><svg viewBox="0 0 300 80"><polyline id="skr" class="sk" style="stroke:var(--warn)" points=""/><text class="t" x="2" y="10">Densidad ρ (kg/m³)</text><text id="skrm" class="t" x="298" y="10" text-anchor="end"></text></svg></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Aire en el globo (BME280, A1–A6)</h2>
+    <div class="big"><span id="rho">–</span> <span>kg/m³</span></div>
+    <div class="note">Densidad ρ del aire húmedo</div>
+    <div class="row"><i>Presión</i><b id="p">–</b></div>
+    <div class="row"><i>Temperatura</i><b id="tc">–</b></div>
+    <div class="row"><i>Humedad relativa</i><b id="hr">–</b></div>
+    <div class="row"><i>Presión de vapor p_v</i><b id="pv">–</b></div>
+    <div class="row"><i>Diferencia vs. aire seco</i><b id="dry">–</b></div>
+    <div class="row"><i>Diferencia vs. suelo ρ₀</i><b id="r0">–</b></div>
+    <div class="row"><i>Reynolds</i><b id="re">–</b></div>
+  </section>
+
+  <section class="card">
+    <h2>Altitud (fórm. 7 y 8)</h2>
+    <div class="big"><span id="h">–</span> <span>m</span></div>
+    <div class="bar"><u id="hbar" style="width:0"></u></div>
+    <div class="cols" style="font-size:11px;color:var(--muted)"><span>0 m</span><span style="text-align:right">ℓ = 40 m de cuerda</span></div>
+    <div class="row"><i>Barométrica (8)</i><b id="hb">–</b></div>
+    <div class="row"><i>Hipsométrica (7)</i><b id="hh">–</b></div>
+    <div class="row"><i>Diferencia entre métodos</i><b id="hd">–</b></div>
+    <div class="row"><i>Referencia suelo P₀ (N1)</i><b>1015.2 hPa</b></div>
+  </section>
+
+  <section class="card">
+    <h2>Celda de carga y cuerda (15, 16, 14, 17)</h2>
+    <div class="row"><i>Cuentas HX711</i><b id="cnt">–</b></div>
+    <div class="row"><i>Desalineación Δψ (N5)</i><b id="dpsi">–</b></div>
+    <div class="row"><i>Uso del rango (20 kg)</i><b id="rng">–</b></div>
+    <div class="bar"><u id="rbar" style="width:0"></u></div>
+    <div class="row"><i>Tensión total T</i><b id="ten">–</b></div>
+    <div class="row"><i>T máx. del vuelo</i><b id="tmax">–</b></div>
+    <div class="row"><i>Factor de seguridad (obj. ≥ 5)</i><b id="fs">–</b></div>
+    <div class="bar"><u id="fbar" style="width:0;background:var(--ok)"></u><span class="mk" style="left:12.5%"></span></div>
+    <div class="note">Marca = FS 5 (escala 0–40)</div>
+  </section>
+
+  <section class="card">
+    <h2>Batería y radio (18–21)</h2>
+    <div class="row"><i>Batería LiPo 2S</i><b id="vb">–</b></div>
+    <div class="bar"><u id="bbar" style="width:0;background:var(--ok)"></u></div>
+    <div class="row"><i>Autonomía restante est.</i><b id="aut">–</b></div>
+    <div class="row"><i>Margen del enlace a 0.2 km</i><b id="mg">–</b></div>
+    <div class="row"><i>Paquetes recibidos / enviados</i><b id="pk">–</b></div>
+    <div class="row"><i>Pérdida de paquetes</i><b id="loss">–</b></div>
+    <div class="bar"><u id="lbar" style="width:0"></u></div>
+  </section>
+</div>
+<div class="raw" id="raw"></div>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)},S=function(i,t){$(i).textContent=t};
+var G=9.80665,P0=1015.2,T0=18.5,HR0=72,CDA=0.5056,L0=120340,FAC=214800,LEN=40,N=60;
+var t=0,burst=0,paused=false,sent=0,recv=0,vb=7.84,tmax=0,gmax=0,dpsi=10;
+var H={v:[],f:[],h:[],r:[]},buf=[],vbuf=[];
+function gauss(s){return 0}
+function dens(P,Tc,hr){var T=Tc+273.15,e=6.1078*Math.pow(10,7.5*Tc/(Tc+237.3)),pv=e*hr/100,Tv=T/(1-0.378*pv/P);return{rho:P*100/(287.05*Tv),Tv:Tv,pv:pv,dry:P*100/(287.05*T)}}
+var g0=dens(P0,T0,HR0);
+function eta(T){return 1.716e-5*Math.pow(T/273.15,1.5)*(273.15+110.4)/(T+110.4)}
+function sim(){ /* "radio": produce a raw packet */
+  t++;burst*=0.86;
+  var v=3.5+1.1*Math.sin(t/9)+0.5*Math.sin(t/2.3)+gauss(0.15)+burst;
+  dpsi=Math.max(2,Math.min(18,dpsi+gauss(0.8)+(10-dpsi)*0.1));
+  var rt=1.2058,FH=0.5*rt*CDA*v*v,FV=1.8+gauss(0.04);
+  var th=Math.atan(FV/FH),h=LEN*Math.sin(th);
+  var Fm=FH*Math.cos(dpsi*Math.PI/180);
+  var P=P0*Math.pow(1-h/44330,1/0.1903)+gauss(0.03);
+  vb=Math.max(6.4,vb-0.0004);
+  sent++;var ok=true;if(ok)recv++;
+  return {ok:ok,P:P,T:T0-0.0065*h+gauss(0.05),HR:HR0+0.1*h+gauss(0.2),L:Math.round(L0+Fm/G*FAC+gauss(45)),dpsi:dpsi,FV:FV,adc:Math.round(vb/2/5*1023)}
+}
+function calc(p){ /* the GUI interprets the packet */
+  var d=dens(p.P,p.T,p.HR),Tk=p.T+273.15;
+  var Fm=(p.L-L0)/FAC*G,FH=Fm/Math.cos(p.dpsi*Math.PI/180);
+  buf.push(FH);if(buf.length>5)buf.shift();
+  var Fa=buf.reduce(function(a,b){return a+b},0)/buf.length;
+  var v=Math.sqrt(2*Fa/(d.rho*CDA));
+  vbuf.push(v);if(vbuf.length>3)vbuf.shift();
+  var g3=vbuf.reduce(function(a,b){return a+b},0)/vbuf.length;if(g3>gmax)gmax=g3;
+  var hb=44330*(1-Math.pow(p.P/P0,0.1903));
+  var hh=287.05*((g0.Tv+d.Tv)/2)/G*Math.log(P0/p.P);
+  var thG=Math.asin(Math.min(1,Math.max(0,hh/LEN))),thC=Math.atan(p.FV/FH);
+  var Tn=Math.sqrt(FH*FH+p.FV*p.FV);if(Tn>tmax)tmax=Tn;
+  var dFm=3*45*G/FAC;
+  return {d:d,Fm:Fm,FH:FH,v:v,g3:g3,hb:hb,hh:hh,thG:thG,thC:thC,Tn:Tn,FS:0.6*600/tmax,
+   v13:Math.sqrt(2*p.FV/(d.rho*CDA*Math.tan(thG))),vmin:Math.sqrt(2*dFm/(d.rho*CDA)),
+   Re:d.rho*v*0.8/eta(Tk),vb:p.adc*5/1023*2}
+}
+function spark(id,arr,mid,dec){var mn=Math.min.apply(0,arr),mx=Math.max.apply(0,arr);if(mx-mn<1e-6){mx+=.5;mn-=.5}
+  var pts=arr.map(function(y,i){return (i*300/(N-1)).toFixed(1)+","+(72-(y-mn)/(mx-mn)*56).toFixed(1)}).join(" ");
+  $(id).setAttribute("points",pts);S(mid,mn.toFixed(dec)+" – "+mx.toFixed(dec))}
+function push(k,x){H[k].push(x);if(H[k].length>N)H[k].shift()}
+function col(x,a,b){return x<a?"var(--ok)":x<b?"var(--warn)":"var(--bad)"}
+function tick(){
+  var p=sim();if(!p.ok){render(null);return}
+  var c=calc(p);
+  push("v",c.v);push("f",c.FH);push("h",c.hh);push("r",c.d.rho);
+  render(p,c);
+}
+function render(p,c){
+  S("stt",(paused?"Pausado":"En vivo")+" · paquete #"+sent);
+  S("pk",recv+" / "+sent);var loss=(sent-recv)/sent*100;S("loss",loss.toFixed(1)+" %");
+  $("lbar").style.width=Math.min(100,loss*5)+"%";$("lbar").style.background=col(loss,5,10);
+  if(!p)return;
+  S("v",c.v.toFixed(2));S("vk",(c.v*3.6).toFixed(1)+" km/h");
+  $("arc").setAttribute("stroke-dasharray",(Math.min(1,c.v/10)*251.3).toFixed(1)+" 252");
+  $("arc").setAttribute("stroke",col(c.v,5,7));
+  var a=Math.PI*(1-Math.min(1,c.v/10));$("needle").setAttribute("x2",100+70*Math.cos(a));$("needle").setAttribute("y2",100-70*Math.sin(a));
+  S("gmax",gmax.toFixed(2)+" m/s");S("v13",c.v13.toFixed(2)+" m/s ("+(c.v13-c.v>=0?"+":"")+(c.v13-c.v).toFixed(2)+")");S("vmin",c.vmin.toFixed(2)+" m/s");
+  /* side view */
+  var th=c.thC,L=125,bx=41+L*Math.cos(th),by=160-L*Math.sin(th);
+  $("rope").setAttribute("x2",bx);$("rope").setAttribute("y2",by);
+  $("b1").setAttribute("cx",bx);$("b1").setAttribute("cy",by-8);$("b2").setAttribute("cx",bx+18);$("b2").setAttribute("cy",by-14);
+  var ex=Math.min(120,c.FH*7);$("fh").setAttribute("x1",bx+34);$("fh").setAttribute("y1",by-10);$("fh").setAttribute("x2",bx+34+ex);$("fh").setAttribute("y2",by-10);
+  var ey=Math.min(70,p.FV*14);$("fv").setAttribute("x1",bx);$("fv").setAttribute("y1",by-26);$("fv").setAttribute("x2",bx);$("fv").setAttribute("y2",by-26-ey);
+  var r=38,ax=41+r*Math.cos(th),ay=160-r*Math.sin(th);
+  $("angarc").setAttribute("d","M"+(41+r)+" 160 A"+r+" "+r+" 0 0 0 "+ax+" "+ay);
+  S("angt",(th*180/Math.PI).toFixed(0)+"°");S("hlab","h ≈ "+c.hh.toFixed(1)+" m");
+  S("fh2",c.FH.toFixed(2)+" N");S("fv2",p.FV.toFixed(2)+" N");
+  S("ang",(c.thG*180/Math.PI).toFixed(1)+"° / "+(c.thC*180/Math.PI).toFixed(1)+"°");
+  spark("skv",H.v,"skvm",1);spark("skf",H.f,"skfm",1);spark("skh",H.h,"skhm",1);spark("skr",H.r,"skrm",4);
+  /* air */
+  S("rho",c.d.rho.toFixed(4));S("p",p.P.toFixed(2)+" hPa");S("tc",p.T.toFixed(1)+" °C");S("hr",p.HR.toFixed(0)+" %");S("pv",c.d.pv.toFixed(2)+" hPa");
+  S("dry",((c.d.rho/c.d.dry-1)*100).toFixed(2)+" %");S("r0",((c.d.rho/g0.rho-1)*100).toFixed(3)+" %");S("re",(c.Re/1e5).toFixed(2)+"×10⁵");
+  /* altitude */
+  S("h",c.hh.toFixed(1));$("hbar").style.width=Math.min(100,c.hh/LEN*100)+"%";
+  S("hb",c.hb.toFixed(1)+" m");S("hh",c.hh.toFixed(1)+" m");S("hd",Math.abs(c.hb-c.hh).toFixed(2)+" m");
+  /* load cell */
+  S("cnt",p.L.toLocaleString("es-MX"));S("dpsi",p.dpsi.toFixed(1)+"°");
+  var rg=c.FH/(20*G)*100;S("rng",rg.toFixed(2)+" %");$("rbar").style.width=Math.min(100,rg*4)+"%";
+  S("ten",c.Tn.toFixed(2)+" N");S("tmax",tmax.toFixed(2)+" N");S("fs",c.FS.toFixed(0));
+  $("fbar").style.width=Math.min(100,c.FS/40*100)+"%";$("fbar").style.background=c.FS<5?"var(--bad)":"var(--ok)";
+  /* system */
+  S("vb",c.vb.toFixed(2)+" V");var pc=Math.max(0,Math.min(100,(c.vb-6.4)/(8.4-6.4)*100));
+  $("bbar").style.width=pc+"%";$("bbar").style.background=col(100-pc,60,85);
+  S("aut",(450*0.8*pc/100/20.6).toFixed(1)+" h");
+  var fs=20*Math.log10(0.2)+20*Math.log10(2440)+32.44;S("mg",(20+2+2-fs+94).toFixed(1)+" dB");
+  S("raw","PKT #"+sent+" · P="+p.P.toFixed(2)+" · T="+p.T.toFixed(2)+" · HR="+p.HR.toFixed(1)+" · L="+p.L+" · Δψ="+p.dpsi.toFixed(1)+" · F_V="+p.FV.toFixed(2)+" · ADC="+p.adc);
+  var al=[];if(c.FS<5)al.push("Factor de seguridad bajo");if(c.vb<6.9)al.push("Batería baja");if(loss>10)al.push("Pérdida de paquetes alta");if(c.v>7)al.push("Ráfaga fuerte: "+c.v.toFixed(1)+" m/s");
+  var A=$("alert");A.style.display=al.length?"block":"none";A.textContent="⚠ "+al.join(" · ");
+}
+function zero(){
+  S("stt",(paused?"Pausado":"En vivo")+" · paquete #0");
+  S("pk","0 / 0");S("loss","0.0 %");$("lbar").style.width="0%";
+  S("v","0.00");S("vk","0.0 km/h");
+  $("arc").setAttribute("stroke-dasharray","0 252");
+  $("needle").setAttribute("x2",30);$("needle").setAttribute("y2",100);
+  S("gmax","0.00 m/s");S("v13","0.00 m/s (0.00)");S("vmin","0.00 m/s");
+  $("rope").setAttribute("x2",166);$("rope").setAttribute("y2",160);
+  $("b1").setAttribute("cx",166);$("b1").setAttribute("cy",152);$("b2").setAttribute("cx",184);$("b2").setAttribute("cy",146);
+  ["fh","fv"].forEach(function(k){["x1","y1","x2","y2"].forEach(function(a){$(k).setAttribute(a,0)})});
+  $("angarc").setAttribute("d","");S("angt","0°");S("hlab","h ≈ 0.0 m");
+  S("fh2","0.00 N");S("fv2","0.00 N");S("ang","0.0° / 0.0°");
+  ["skv","skf","skh","skr"].forEach(function(k){$(k).setAttribute("points","")});
+  S("skvm","0.0 – 0.0");S("skfm","0.0 – 0.0");S("skhm","0.0 – 0.0");S("skrm","0.0000 – 0.0000");
+  S("rho","0.0000");S("p","0.00 hPa");S("tc","0.0 °C");S("hr","0 %");S("pv","0.00 hPa");
+  S("dry","0.00 %");S("r0","0.000 %");S("re","0.00×10⁵");
+  S("h","0.0");$("hbar").style.width="0%";S("hb","0.0 m");S("hh","0.0 m");S("hd","0.00 m");
+  S("cnt","0");S("dpsi","0.0°");S("rng","0.00 %");$("rbar").style.width="0%";
+  S("ten","0.00 N");S("tmax","0.00 N");S("fs","0");$("fbar").style.width="0%";
+  S("vb","0.00 V");$("bbar").style.width="0%";S("aut","0.0 h");S("mg","0.0 dB");
+  S("raw","PKT #0 · P=0.00 · T=0.00 · HR=0.0 · L=0 · Δψ=0.0 · F_V=0.00 · ADC=0");
+  $("alert").style.display="none";
+}
+zero();
+$("pause").onclick=function(){paused=!paused;$("pause").textContent=paused?"Reanudar":"Pausar";$("st").className=paused?"pill paused":"pill";zero()};
+$("gust").onclick=function(){burst=4.5};
+$("theme").onclick=function(){var r=document.documentElement,d=r.getAttribute("data-theme");r.setAttribute("data-theme",d==="dark"?"light":"dark")};
+})();
+</script>
+<div id="modalReporte" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;padding:20px;overflow-y:auto">
+  <div class="card" style="max-width:650px;margin:20px auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;font-size:16px;color:var(--text)">Reporte de Vuelo</h2>
+      <div>
+        <button onclick="window.print()">Imprimir / PDF</button>
+        <button onclick="document.getElementById('modalReporte').style.display='none'">Cerrar</button>
+      </div>
+    </div>
+    <div id="contenidoReporte">Cargando datos...</div>
+  </div>
+</div>
+
+<script>
+const VUELO_ID = 1;
+
+// lee la ultima lectura de postgres cada 2 segundos
+async function actualizarDesdeBD() {
+  try {
+    const res = await fetch(`/api/ultima-lectura/${VUELO_ID}`);
+    const dato = await res.json();
+    if (!dato) return;
+
+    document.getElementById('v').textContent = (dato.viento_ms || 0).toFixed(2);
+    document.getElementById('vk').textContent = ((dato.viento_ms || 0) * 3.6).toFixed(1) + ' km/h';
+    document.getElementById('p').textContent = dato.presion_hpa.toFixed(2) + ' hPa';
+    document.getElementById('tc').textContent = dato.temperatura_c.toFixed(1) + ' °C';
+    document.getElementById('hr').textContent = dato.humedad_rel_pct.toFixed(0) + ' %';
+    document.getElementById('rho').textContent = dato.densidad_kg_m3.toFixed(4);
+    document.getElementById('h').textContent = (dato.altitud_m || 0).toFixed(1);
+    document.getElementById('fh2').textContent = (dato.fuerza_h_n || 0).toFixed(2) + ' N';
+    document.getElementById('ten').textContent = (dato.tension_n || 0).toFixed(2) + ' N';
+    document.getElementById('vb').textContent = (dato.bateria_v || 0).toFixed(2) + ' V';
+    document.getElementById('stt').textContent = 'BD Conectada · Lectura #' + dato.id;
+  } catch (e) {
+    console.error('Error conectando a la BD:', e);
+  }
+}
+setInterval(actualizarDesdeBD, 2000);
+actualizarDesdeBD();
+
+// boton que genera reporte
+document.getElementById('btnReporte').onclick = async () => {
+  const modal = document.getElementById('modalReporte');
+  const cont = document.getElementById('contenidoReporte');
+  modal.style.display = 'block';
+  cont.innerHTML = 'Consultando base de datos...';
+
+  try {
+    const res = await fetch(`/api/reporte/${VUELO_ID}`);
+    const r = await res.json();
+    if (!r) {
+      cont.innerHTML = '<p>Aún no hay datos registrados para el vuelo #1 en PostgreSQL.</p>';
+      return;
+    }
+    const min = r.lectura_viento_min || {};
+    const max = r.lectura_viento_max || {};
+
+    cont.innerHTML = `
+      <h3>1. Datos Generales del Vuelo</h3>
+      <div class="row"><i>Nombre:</i><b>${r.nombre}</b></div>
+      <div class="row"><i>Lugar:</i><b>${r.lugar || 'No especificado'}</b></div>
+      <div class="row"><i>Hora inicial:</i><b>${new Date(r.inicio).toLocaleString('es-MX')}</b></div>
+      <div class="row"><i>Hora final:</i><b>${r.fin ? new Date(r.fin).toLocaleString('es-MX') : 'En curso'}</b></div>
+      <div class="row"><i>Total de lecturas:</i><b>${r.total_lecturas}</b></div>
+
+      <h3 style="margin-top:16px">2. Promedios del Vuelo</h3>
+      <div class="row"><i>Viento promedio:</i><b>${r.viento_prom_ms ?? '–'} m/s</b></div>
+      <div class="row"><i>Temperatura promedio:</i><b>${r.temp_prom_c ?? '–'} °C</b></div>
+      <div class="row"><i>Presión promedio:</i><b>${r.presion_prom_hpa ?? '–'} hPa</b></div>
+      <div class="row"><i>Humedad promedio:</i><b>${r.hr_prom_pct ?? '–'} %</b></div>
+      <div class="row"><i>Altitud promedio:</i><b>${r.altitud_prom_m ?? '–'} m</b></div>
+
+      <h3 style="margin-top:16px">3. Viento Más Bajo</h3>
+      <div class="row"><i>Velocidad:</i><b>${min.viento_ms ?? '–'} m/s</b></div>
+      <div class="row"><i>Hora:</i><b>${min.ts ? new Date(min.ts).toLocaleTimeString('es-MX') : '–'}</b></div>
+      <div class="row"><i>Altitud / Temp:</i><b>${min.altitud_m ?? '–'} m · ${min.temperatura_c ?? '–'} °C</b></div>
+
+      <h3 style="margin-top:16px">4. Viento Más Alto</h3>
+      <div class="row"><i>Velocidad (Ráfaga):</i><b>${max.viento_ms ?? '–'} m/s (${max.rafaga_ms ?? '–'} m/s)</b></div>
+      <div class="row"><i>Hora:</i><b>${max.ts ? new Date(max.ts).toLocaleTimeString('es-MX') : '–'}</b></div>
+      <div class="row"><i>Altitud / Tensión:</i><b>${max.altitud_m ?? '–'} m · ${max.tension_n ?? '–'} N</b></div>
+    `;
+  } catch (err) {
+    cont.innerHTML = '<p style="color:var(--bad)">Error de conexión con la base de datos.</p>';
+  }
+};
+</script>
+</body>
+</html>

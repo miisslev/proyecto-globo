@@ -1,0 +1,34 @@
+-- vista para el reporte del vuelo 
+CREATE OR REPLACE VIEW v_reporte_vuelo AS
+SELECT 
+    v.id AS vuelo_id,
+    v.nombre,
+    v.lugar,
+    v.inicio,
+    v.fin,
+    v.longitud_cuerda_m,
+    v.n_globos,
+    v.notas,
+    COUNT(l.id) AS total_lecturas,
+    -- Promedios del vuelo
+    ROUND(AVG(l.viento_ms)::numeric, 2) AS viento_prom_ms,
+    ROUND(AVG(l.temperatura_c)::numeric, 2) AS temp_prom_c,
+    ROUND(AVG(l.presion_hpa)::numeric, 2) AS presion_prom_hpa,
+    ROUND(AVG(l.humedad_rel_pct)::numeric, 1) AS hr_prom_pct,
+    ROUND(AVG(l.altitud_m)::numeric, 2) AS altitud_prom_m,
+    ROUND(AVG(l.tension_n)::numeric, 2) AS tension_prom_n,
+    -- Lectura con el viento MÁS BAJO
+    (SELECT row_to_json(l_min) FROM (
+        SELECT ts, viento_ms, altitud_m, temperatura_c, presion_hpa, tension_n
+        FROM lectura WHERE vuelo_id = v.id AND viento_ms IS NOT NULL
+        ORDER BY viento_ms ASC, ts ASC LIMIT 1
+    ) l_min) AS lectura_viento_min,
+    -- Lectura con el viento MÁS ALTO
+    (SELECT row_to_json(l_max) FROM (
+        SELECT ts, viento_ms, rafaga_ms, altitud_m, temperatura_c, presion_hpa, tension_n
+        FROM lectura WHERE vuelo_id = v.id AND viento_ms IS NOT NULL
+        ORDER BY viento_ms DESC, ts ASC LIMIT 1
+    ) l_max) AS lectura_viento_max
+FROM vuelo v
+LEFT JOIN lectura l ON l.vuelo_id = v.id
+GROUP BY v.id;
